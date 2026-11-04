@@ -1,7 +1,8 @@
 import type { PointOfInterest, Vec3 } from '@namma/shared';
-import { Grid, Html, OrbitControls } from '@react-three/drei';
-import { Canvas, type ThreeEvent } from '@react-three/fiber';
-import { useState } from 'react';
+import { Grid, OrbitControls } from '@react-three/drei';
+import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
+import { useRef, useState, type RefObject } from 'react';
+import { Vector3 } from 'three';
 
 export interface SpaceViewerProps {
   pois: PointOfInterest[];
@@ -58,11 +59,39 @@ function Marker({
         <cylinderGeometry args={[0.02, 0.02, 0.25, 8]} />
         <meshStandardMaterial color={color} />
       </mesh>
-      <Html position={[0, 0.6, 0]} center distanceFactor={10} zIndexRange={[10, 0]}>
-        <div className={`poi-label${selected ? ' poi-label-selected' : ''}`}>{poi.name}</div>
-      </Html>
     </group>
   );
+}
+
+const LABEL_HEIGHT = 0.6;
+
+/**
+ * Positions the DOM labels over their markers every frame. Labels live in a
+ * plain DOM layer above the canvas, so they stay crisp and accessible.
+ */
+function LabelProjector({
+  pois,
+  labels,
+}: {
+  pois: PointOfInterest[];
+  labels: RefObject<Map<string, HTMLDivElement>>;
+}) {
+  const v = useRef(new Vector3());
+  useFrame(({ camera, size }) => {
+    for (const poi of pois) {
+      const el = labels.current.get(poi.id);
+      if (!el) continue;
+      v.current.set(poi.position.x, poi.position.y + LABEL_HEIGHT, poi.position.z).project(camera);
+      const visible =
+        v.current.z < 1 && Math.abs(v.current.x) <= 1.1 && Math.abs(v.current.y) <= 1.1;
+      el.style.display = visible ? 'block' : 'none';
+      if (!visible) continue;
+      const x = ((v.current.x + 1) / 2) * size.width;
+      const y = ((1 - v.current.y) / 2) * size.height;
+      el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y}px)`;
+    }
+  });
+  return null;
 }
 
 /**
@@ -79,6 +108,7 @@ export default function SpaceViewer({
   onSelectPoi,
 }: SpaceViewerProps) {
   const [hover, setHover] = useState<Vec3 | null>(null);
+  const labels = useRef(new Map<string, HTMLDivElement>());
 
   const toVec = (e: ThreeEvent<PointerEvent | MouseEvent>): Vec3 => ({
     x: round(e.point.x),
@@ -126,8 +156,24 @@ export default function SpaceViewer({
             <meshStandardMaterial color="#ffffff" transparent opacity={0.8} />
           </mesh>
         )}
+        <LabelProjector pois={pois} labels={labels} />
         <OrbitControls makeDefault maxPolarAngle={Math.PI / 2.05} />
       </Canvas>
+      <div className="poi-labels" aria-hidden>
+        {pois.map((p) => (
+          <div
+            key={p.id}
+            ref={(el) => {
+              if (el) labels.current.set(p.id, el);
+              else labels.current.delete(p.id);
+            }}
+            className={`poi-label${p.id === selectedPoiId ? ' poi-label-selected' : ''}`}
+            style={{ display: 'none' }}
+          >
+            {p.name}
+          </div>
+        ))}
+      </div>
       <div className="viewer-overlay">
         <span>No 3D reconstruction yet · floor grid is 1 m</span>
         {pickMode && (

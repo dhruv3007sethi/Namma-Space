@@ -534,7 +534,17 @@ fieldset.vec3 legend {
   border-radius: 4px;
   width: fit-content;
 }
+.poi-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
 .poi-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
   font: 600 12px var(--font);
   color: #fff;
   background: rgb(11 18 32 / 80%);
