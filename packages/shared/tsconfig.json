@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "customConditions": ["@namma/source"],
+    "types": []
+  },
+  "include": ["src"]
+}
